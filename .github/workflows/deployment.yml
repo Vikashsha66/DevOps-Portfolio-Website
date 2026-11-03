@@ -1,0 +1,100 @@
+
+name: Production Deployment
+
+on:
+  push:
+    branches:
+      - prod
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: office-production-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Office Ubuntu
+    runs-on: [self-hosted, linux, production]
+    environment: production
+
+    env:
+      APP_NAME: production-app
+      APP_PORT: "3000"
+      IMAGE_NAME: office-production-app
+
+    steps:
+      - name: Checkout production code
+        uses: actions/checkout@v4
+
+      - name: Deploy with automatic rollback
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          NEW_IMAGE="${IMAGE_NAME}:${GITHUB_SHA}"
+          OLD_IMAGE="${IMAGE_NAME}:rollback"
+
+          echo "Building production image..."
+          docker build -t "$NEW_IMAGE" .
+
+          # Save the currently deployed image
+          if docker inspect "$APP_NAME" >/dev/null 2>&1; then
+            CURRENT_IMAGE=$(docker inspect \
+              --format='{{.Config.Image}}' "$APP_NAME")
+
+            docker tag "$CURRENT_IMAGE" "$OLD_IMAGE"
+            echo "Previous image saved: $OLD_IMAGE"
+          else
+            OLD_IMAGE=""
+            echo "No previous deployment found"
+          fi
+
+          # Stop old container
+          docker rm -f "$APP_NAME" 2>/dev/null || true
+
+          # Start new container
+          docker run -d \
+            --name "$APP_NAME" \
+            --restart unless-stopped \
+            -p "${APP_PORT}:${APP_PORT}" \
+            "$NEW_IMAGE"
+
+          # Wait for health check
+          HEALTHY=0
+
+          for i in $(seq 1 30); do
+            if curl -fsS \
+              "http://127.0.0.1:${APP_PORT}/health" \
+              >/dev/null; then
+              HEALTHY=1
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$HEALTHY" -eq 1 ]; then
+            echo "Deployment successful: $NEW_IMAGE"
+            exit 0
+          fi
+
+          echo "Health check failed. Rolling back..."
+
+          docker logs "$APP_NAME" || true
+          docker rm -f "$APP_NAME" || true
+
+          if [ -n "$OLD_IMAGE" ]; then
+            docker run -d \
+              --name "$APP_NAME" \
+              --restart unless-stopped \
+              -p "${APP_PORT}:${APP_PORT}" \
+              "$OLD_IMAGE"
+
+            echo "Rollback completed"
+          else
+            echo "No previous image available"
+          fi
+
+          exit 1
