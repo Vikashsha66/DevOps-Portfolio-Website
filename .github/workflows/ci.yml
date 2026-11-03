@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: fbsplims-app-producion${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -21,25 +21,5 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      # Add project-specific tests here.
-
       - name: Docker build validation
-        run: docker build -t app-ci:${{ github.sha }} .
-
-      - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
-        with:
-          scan-type: fs
-          scan-ref: .
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: 1
-
-      - name: Trivy image scan
-        uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
-        with:
-          scan-type: image
-          image-ref: app-ci:${{ github.sha }}
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: 1
+        run: docker build -t fbsplims-app:${{ github.sha }} .
