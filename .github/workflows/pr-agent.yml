@@ -1,0 +1,51 @@
+
+name: AI Code Review - PR Agent
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+      - synchronize
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: pr-agent-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ai-review:
+    name: AI Code Review
+    if: >
+      github.event.pull_request.draft == false &&
+      github.event.sender.type != 'Bot'
+
+    # Change labels if your runner uses different labels.
+    runs-on: [self-hosted, linux]
+
+    steps:
+      - name: Run Qodo PR-Agent
+        uses: the-pr-agent/pr-agent@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          # Local AI model
+          config.model: "ollama/qwen2.5-coder:7b"
+          config.fallback_models: '[]'
+          config.custom_model_max_tokens: "8192"
+
+          # Your Ubuntu desktop's private IP
+          OLLAMA.API_BASE: "http://192.168.1.39:11434"
+
+          # Automatic review settings
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "false"
+          github_action_config.auto_improve: "false"
+
+          # Run review again when PR receives new commits
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "synchronize"]'
