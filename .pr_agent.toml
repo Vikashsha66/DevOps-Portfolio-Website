@@ -1,0 +1,33 @@
+
+[config]
+model = "ollama/qwen2.5-coder:7b"
+fallback_models = []
+
+[pr_reviewer]
+require_score_review = true
+require_tests_review = true
+require_estimate_effort_to_review = true
+require_security_review = true
+
+extra_instructions = """
+You are a senior DevSecOps and software engineer.
+
+Review all changed files.
+
+Pay special attention to:
+- Node.js and React security
+- API authentication and authorization
+- SQL injection
+- XSS and CSRF
+- Dockerfile security
+- Docker Compose configuration
+- Environment variable handling
+- Database queries
+- Performance and memory usage
+- Error handling
+- Code duplication
+
+Do not expose secrets in review comments.
+Do not make assumptions without evidence.
+Provide actionable recommendations.
+"""
